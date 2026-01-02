@@ -33,6 +33,7 @@ var tick = (elapsedTime, multiplier) => {
     }
 
     theory.invalidatePrimaryEquation();
+    theory.invalidateSecondaryEquation();
     theory.invalidateQuaternaryValues();
 };
 
@@ -141,10 +142,15 @@ var getPrimaryEquation = () => {
 };
 
 var getSecondaryEquation = () => {
-    if (theoryManager?.getScheduleDisplay) {
-        return theoryManager.getScheduleDisplay();
+    let s = "";
+    if (game.activeTheory && game.activeTheory.id !== 8) {
+        s = "\\tau=" + game.activeTheory.tau;
     }
-    return "";
+    if (theoryManager?.getScheduleDisplay) {
+        const sched = theoryManager.getScheduleDisplay();
+        if (sched) s += s ? "\\quad" + sched : sched;
+    }
+    return s;
 };
 
 var getCurrencyBarDelegate = () => createCurrencyBar();
