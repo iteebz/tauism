@@ -2,7 +2,7 @@ import { MIN_ALLOC_FREQ } from './config.js';
 
 export const state = {
     useR9: false,
-    autoFreq: -1,
+    autoFreq: 42,
     enableVariablePurchase: true,
     enableMSPurchase: true,
     enablePublications: true,
