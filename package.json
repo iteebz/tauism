@@ -1,0 +1,11 @@
+{
+  "name": "tauism",
+  "version": "0.1.0",
+  "description": "Exponential Idle theory automator - the doctrine of tau maximization",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --format=iife --outfile=dist/tauism.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  }
+}
