@@ -17,9 +17,12 @@ class T5 extends BaseStrategy {
         this.coast = this.pub / 10;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    getScheduleDisplay() {
+        return "Ratio\\ buying:\\ q,c";
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
 
         const c1cost = upgradeCost(this.c1);
         buyMax(this.c3, c1cost);
@@ -38,12 +41,12 @@ class T5 extends BaseStrategy {
         return this.theory.tau >= this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }

@@ -127,9 +127,20 @@ class T4 extends BaseStrategy {
         return true;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    getScheduleDisplay() {
+        if (!this.scheduledUpgrades.length) return "Scheduling...";
+        let s = "Next: ";
+        const names = ["c_1", "c_2", "c_3", "q_1", "q_2"];
+        for (let i = 0; i < Math.min(this.scheduledUpgrades.length, 5); i++) {
+            if (this.scheduledUpgrades[i][1] > 1) s += this.scheduledUpgrades[i][1];
+            s += names[this.scheduledUpgrades[i][0]];
+            if (i + 1 < Math.min(this.scheduledUpgrades.length, 5)) s += ", ";
+        }
+        return s;
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
         if (this.theory.currencies[0].value == 0) this.c1.buy(1);
 
         const k = (this.q + 1) * toBig(2).pow(this.c3.level) / (toBig(2).pow(this.c2.level) * this.getC1);
@@ -155,12 +166,12 @@ class T4 extends BaseStrategy {
         return this.theory.tau >= this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }

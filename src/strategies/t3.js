@@ -117,13 +117,42 @@ class T3 extends BaseStrategy {
         return true;
     }
 
-    buy(state) {
+    getScheduleDisplay() {
+        let s = "";
+        if (this.scheduledUpgrades1.length) {
+            s += "\\rho_1: ";
+            for (let i = 0; i < Math.min(this.scheduledUpgrades1.length, 3); i++) {
+                if (this.scheduledUpgrades1[i][1] > 1) s += this.scheduledUpgrades1[i][1];
+                s += this.scheduledUpgrades1[i][0] == 0 ? "b_1" : "c_{31}";
+                if (i + 1 < Math.min(this.scheduledUpgrades1.length, 3)) s += ",";
+            }
+        }
+        if (this.scheduledUpgrades2.length) {
+            if (s) s += "\\ \\ ";
+            s += "\\rho_2: ";
+            for (let i = 0; i < Math.min(this.scheduledUpgrades2.length, 3); i++) {
+                if (this.scheduledUpgrades2[i][1] > 1) s += this.scheduledUpgrades2[i][1];
+                s += this.scheduledUpgrades2[i][0] == 0 ? "b_2" : "c_{" + this.scheduledUpgrades2[i][0] + "2}";
+                if (i + 1 < Math.min(this.scheduledUpgrades2.length, 3)) s += ",";
+            }
+        }
+        if (this.scheduledUpgrades3.length) {
+            if (s) s += "\\ \\ ";
+            s += "\\rho_3: ";
+            for (let i = 0; i < Math.min(this.scheduledUpgrades3.length, 3); i++) {
+                if (this.scheduledUpgrades3[i][1] > 1) s += this.scheduledUpgrades3[i][1];
+                s += this.scheduledUpgrades3[i][0] == 0 ? "b_3" : "c_{" + (this.scheduledUpgrades3[i][0] + 1) + "3}";
+                if (i + 1 < Math.min(this.scheduledUpgrades3.length, 3)) s += ",";
+            }
+        }
+        return s || "Scheduling...";
+    }
+
+    buy() {
         const prevPhase = this.phase;
         if (this.pubMultiplier > this.phase3) this.phase = 4;
         else if (this.pubMultiplier > this.phase2) this.phase = 3;
         else if (this.pubMultiplier > this.phase1) this.phase = 2;
-
-        if (!state.enableVariablePurchase) return;
 
         let refresh1 = false, refresh2 = false, refresh3 = false;
 
@@ -171,12 +200,12 @@ class T3 extends BaseStrategy {
         return this.pubMultiplier > this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }

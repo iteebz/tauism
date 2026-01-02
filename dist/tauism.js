@@ -328,35 +328,20 @@ class AllocUtils {
 }
 
 AllocUtils.MAX_DFS_SIZE = 300;
-
 var state = {
-    useR9: false,
     autoFreq: 42,
-    enableVariablePurchase: true,
-    enableMSPurchase: true,
-    enablePublications: true,
-    enableTheorySwitch: true,
 
     get shouldReallocate() {
-        return this.autoFreq >= MIN_ALLOC_FREQ;
+        return this.autoFreq >= 10;
     },
 
     serialize() {
-        return JSON.stringify({
-            useR9: this.useR9,
-            autoFreq: this.autoFreq,
-            enableVariablePurchase: this.enableVariablePurchase,
-            enableMSPurchase: this.enableMSPurchase,
-            enablePublications: this.enablePublications,
-            enableTheorySwitch: this.enableTheorySwitch
-        });
+        return JSON.stringify({ autoFreq: this.autoFreq });
     },
 
     deserialize(s) {
         if (!s) return;
-        try {
-            Object.assign(this, JSON.parse(s));
-        } catch (e) {}
+        try { Object.assign(this, JSON.parse(s)); } catch (e) {}
     }
 };
 
@@ -474,9 +459,8 @@ class T1 extends BaseStrategy {
         return s;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    buy() {
+        if (this.theory.tau >= this.coast) return;
 
         let refresh = false;
         if (buyRatio(this.q1, 50)) refresh = true;
@@ -512,12 +496,12 @@ class T1 extends BaseStrategy {
         return this.theory.tau > this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }
@@ -577,32 +561,31 @@ class T2 extends BaseStrategy {
         return s;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
+    buy() {
         this.updateSchedule();
 
-        if (this.pubMultiplier >= this.qr1 && state.enablePublications) {
+        if (this.pubMultiplier >= this.qr1) {
             this.phase = 5;
             return;
         }
         this.upgrades[0].buy(-1);
         this.upgrades[4].buy(-1);
 
-        if (this.pubMultiplier >= this.qr2 && state.enablePublications) {
+        if (this.pubMultiplier >= this.qr2) {
             this.phase = 4;
             return;
         }
         this.upgrades[1].buy(-1);
         this.upgrades[5].buy(-1);
 
-        if (this.pubMultiplier >= this.qr3 && state.enablePublications) {
+        if (this.pubMultiplier >= this.qr3) {
             this.phase = 3;
             return;
         }
         this.upgrades[2].buy(-1);
         this.upgrades[6].buy(-1);
 
-        if (this.pubMultiplier >= this.qr4 && state.enablePublications) {
+        if (this.pubMultiplier >= this.qr4) {
             this.phase = 2;
             return;
         }
@@ -614,12 +597,12 @@ class T2 extends BaseStrategy {
         return this.pubMultiplier > this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }
@@ -741,13 +724,42 @@ class T3 extends BaseStrategy {
         return true;
     }
 
-    buy(state) {
+    getScheduleDisplay() {
+        let s = "";
+        if (this.scheduledUpgrades1.length) {
+            s += "\\rho_1: ";
+            for (let i = 0; i < Math.min(this.scheduledUpgrades1.length, 3); i++) {
+                if (this.scheduledUpgrades1[i][1] > 1) s += this.scheduledUpgrades1[i][1];
+                s += this.scheduledUpgrades1[i][0] == 0 ? "b_1" : "c_{31}";
+                if (i + 1 < Math.min(this.scheduledUpgrades1.length, 3)) s += ",";
+            }
+        }
+        if (this.scheduledUpgrades2.length) {
+            if (s) s += "\\ \\ ";
+            s += "\\rho_2: ";
+            for (let i = 0; i < Math.min(this.scheduledUpgrades2.length, 3); i++) {
+                if (this.scheduledUpgrades2[i][1] > 1) s += this.scheduledUpgrades2[i][1];
+                s += this.scheduledUpgrades2[i][0] == 0 ? "b_2" : "c_{" + this.scheduledUpgrades2[i][0] + "2}";
+                if (i + 1 < Math.min(this.scheduledUpgrades2.length, 3)) s += ",";
+            }
+        }
+        if (this.scheduledUpgrades3.length) {
+            if (s) s += "\\ \\ ";
+            s += "\\rho_3: ";
+            for (let i = 0; i < Math.min(this.scheduledUpgrades3.length, 3); i++) {
+                if (this.scheduledUpgrades3[i][1] > 1) s += this.scheduledUpgrades3[i][1];
+                s += this.scheduledUpgrades3[i][0] == 0 ? "b_3" : "c_{" + (this.scheduledUpgrades3[i][0] + 1) + "3}";
+                if (i + 1 < Math.min(this.scheduledUpgrades3.length, 3)) s += ",";
+            }
+        }
+        return s || "Scheduling...";
+    }
+
+    buy() {
         const prevPhase = this.phase;
         if (this.pubMultiplier > this.phase3) this.phase = 4;
         else if (this.pubMultiplier > this.phase2) this.phase = 3;
         else if (this.pubMultiplier > this.phase1) this.phase = 2;
-
-        if (!state.enableVariablePurchase) return;
 
         let refresh1 = false, refresh2 = false, refresh3 = false;
 
@@ -795,12 +807,12 @@ class T3 extends BaseStrategy {
         return this.pubMultiplier > this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }
@@ -932,9 +944,20 @@ class T4 extends BaseStrategy {
         return true;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    getScheduleDisplay() {
+        if (!this.scheduledUpgrades.length) return "Scheduling...";
+        let s = "Next: ";
+        const names = ["c_1", "c_2", "c_3", "q_1", "q_2"];
+        for (let i = 0; i < Math.min(this.scheduledUpgrades.length, 5); i++) {
+            if (this.scheduledUpgrades[i][1] > 1) s += this.scheduledUpgrades[i][1];
+            s += names[this.scheduledUpgrades[i][0]];
+            if (i + 1 < Math.min(this.scheduledUpgrades.length, 5)) s += ", ";
+        }
+        return s;
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
         if (this.theory.currencies[0].value == 0) this.c1.buy(1);
 
         const k = (this.q + 1) * toBig(2).pow(this.c3.level) / (toBig(2).pow(this.c2.level) * this.getC1);
@@ -960,12 +983,12 @@ class T4 extends BaseStrategy {
         return this.theory.tau >= this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }
@@ -987,9 +1010,12 @@ class T5 extends BaseStrategy {
         this.coast = this.pub / 10;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    getScheduleDisplay() {
+        return "Ratio\\ buying:\\ q,c";
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
 
         const c1cost = upgradeCost(this.c1);
         buyMax(this.c3, c1cost);
@@ -1008,12 +1034,12 @@ class T5 extends BaseStrategy {
         return this.theory.tau >= this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }
@@ -1039,9 +1065,12 @@ class T6 extends BaseStrategy {
         this.coast = this.pub / 100;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    getScheduleDisplay() {
+        return "Ratio\\ buying:\\ q,r,c";
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
 
         const c5cost = this.c5.isAvailable ? upgradeCost(this.c5) : parseBigNumber("ee999999");
         const c4cost = this.c4.isAvailable ? upgradeCost(this.c4) : parseBigNumber("ee999999");
@@ -1066,12 +1095,12 @@ class T6 extends BaseStrategy {
         return this.theory.tau >= this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }
@@ -1094,9 +1123,12 @@ class T7 extends BaseStrategy {
         this.coast = this.pub / 10;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    getScheduleDisplay() {
+        return "Ratio\\ buying:\\ c_1..c_6";
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
 
         const c6cost = this.c6.isAvailable ? upgradeCost(this.c6) : parseBigNumber("ee999999");
         const c5cost = this.c5.isAvailable ? upgradeCost(this.c5) : parseBigNumber("ee999999");
@@ -1117,12 +1149,12 @@ class T7 extends BaseStrategy {
         return this.theory.tau >= this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }
@@ -1145,16 +1177,18 @@ class T8 extends BaseStrategy {
         this.coast = this.pub / 4;
     }
 
-    buyMilestones(state) {
-        if (!state.enableMSPurchase) return;
+    buyMilestones() {
         for (let i = 1; i < this.theory.milestoneUpgrades.length; i++) {
             this.theory.milestoneUpgrades[i].buy(-1);
         }
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    getScheduleDisplay() {
+        return "Ratio\\ buying:\\ c_1..c_5";
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
 
         const c5cost = upgradeCost(this.c5);
         const c4cost = upgradeCost(this.c4);
@@ -1177,13 +1211,13 @@ class T8 extends BaseStrategy {
         return this.theory.tau >= this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        this.buyMilestones(state);
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        this.buyMilestones();
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }
@@ -1196,7 +1230,6 @@ var createStrategy = (theoryId) => {
 };
 
 
-
 var createCurrencyBar = () => {
     const starBtn = ui.createButton({
         text: "Reallocate ★",
@@ -1205,108 +1238,16 @@ var createCurrencyBar = () => {
 
     const sigmaBtn = ui.createButton({
         text: "Reallocate σ",
-        onClicked: () => AllocUtils.simpleStudent(state.useR9)
-    });
-
-    const r9Toggle = ui.createStackLayout({
-        children: [
-            ui.createLabel({
-                text: "Buy R9?",
-                fontSize: 10,
-                verticalTextAlignment: TextAlignment.END,
-                horizontalTextAlignment: TextAlignment.CENTER,
-                textColor: () => state.useR9 ? Color.TEXT : Color.DEACTIVATED_UPGRADE
-            }),
-            ui.createSwitch({
-                onColor: Color.SWITCH_BACKGROUND,
-                isToggled: () => state.useR9,
-                onTouched: (e) => { if (e.type == TouchType.PRESSED) state.useR9 = !state.useR9; }
-            })
-        ]
+        onClicked: () => AllocUtils.simpleStudent(true)
     });
 
     starBtn.row = 0; starBtn.column = 0;
     sigmaBtn.row = 0; sigmaBtn.column = 1;
-    r9Toggle.row = 0; r9Toggle.column = 2;
 
-    const allocGrid = ui.createGrid({
-        columnDefinitions: ["1*", "1*", "50"],
-        children: [starBtn, sigmaBtn, r9Toggle]
-    });
-
-    const freqBtn = ui.createButton({
-        text: () => {
-            const f = state.autoFreq < MIN_ALLOC_FREQ ? "Never" : `${state.autoFreq} ticks`;
-            return "Auto-reallocation: " + f;
-        },
-        onClicked: () => showFreqPopup()
-    });
-
-    const varToggle = createToggle("Auto Variables", () => state.enableVariablePurchase, () => state.enableVariablePurchase = !state.enableVariablePurchase);
-    const msToggle = createToggle("Auto Milestones", () => state.enableMSPurchase, () => state.enableMSPurchase = !state.enableMSPurchase);
-    const pubToggle = createToggle("Auto Publish", () => state.enablePublications, () => state.enablePublications = !state.enablePublications);
-    const switchToggle = createToggle("Auto Switch", () => state.enableTheorySwitch, () => state.enableTheorySwitch = !state.enableTheorySwitch);
-
-    varToggle.row = 0; varToggle.column = 0;
-    msToggle.row = 0; msToggle.column = 1;
-    pubToggle.row = 1; pubToggle.column = 0;
-    switchToggle.row = 1; switchToggle.column = 1;
-
-    const toggleGrid = ui.createGrid({
-        rowDefinitions: ["1*", "1*"],
+    return ui.createGrid({
         columnDefinitions: ["1*", "1*"],
-        children: [varToggle, msToggle, pubToggle, switchToggle]
+        children: [starBtn, sigmaBtn]
     });
-
-    return ui.createStackLayout({
-        children: [allocGrid, freqBtn, toggleGrid]
-    });
-};
-
-const createToggle = (label, getter, toggle) => {
-    return ui.createStackLayout({
-        children: [
-            ui.createLabel({
-                text: label,
-                fontSize: 10,
-                verticalTextAlignment: TextAlignment.END,
-                horizontalTextAlignment: TextAlignment.CENTER,
-                textColor: () => getter() ? Color.TEXT : Color.DEACTIVATED_UPGRADE
-            }),
-            ui.createSwitch({
-                onColor: Color.SWITCH_BACKGROUND,
-                isToggled: getter,
-                onTouched: (e) => { if (e.type == TouchType.PRESSED) toggle(); }
-            })
-        ]
-    });
-};
-
-const showFreqPopup = () => {
-    let record = state.autoFreq.toString();
-
-    const entry = ui.createEntry({
-        placeholder: record,
-        onTextChanged: (_, s) => { record = s; }
-    });
-
-    const apply = ui.createButton({ text: "Apply" });
-    const text = ui.createLabel({
-        text: `Enter tick frequency for auto-reallocation.\nValues < ${MIN_ALLOC_FREQ} = disabled.`
-    });
-
-    const popup = ui.createPopup({
-        title: "Reallocation Frequency",
-        content: ui.createStackLayout({ children: [entry, text, apply] })
-    });
-
-    apply.onClicked = () => {
-        const num = parseInt(record);
-        if (!isNaN(num)) state.autoFreq = num;
-        popup.hide();
-    };
-
-    popup.show();
 };
 var theoryManager = null;
 var R9 = 1;
@@ -1324,18 +1265,14 @@ var tick = (elapsedTime, multiplier) => {
 
     if (state.shouldReallocate && game.statistics.tickCount % state.autoFreq == 0) {
         AllocUtils.simpleStar();
-        AllocUtils.simpleStudent(state.useR9);
-        if (state.enableTheorySwitch) {
-            switchTheory();
-        }
+        AllocUtils.simpleStudent(true);
+        switchTheory();
     }
 
     if (theoryManager) {
         buyMilestones();
-        const published = theoryManager.tick(elapsedTime, multiplier, state);
-        if (published) {
-            refreshTheoryManager();
-        }
+        const published = theoryManager.tick(elapsedTime, multiplier);
+        if (published) refreshTheoryManager();
     }
 
     theory.invalidatePrimaryEquation();
@@ -1343,7 +1280,6 @@ var tick = (elapsedTime, multiplier) => {
 };
 
 var buyMilestones = () => {
-    if (!state.enableMSPurchase) return;
     if (!game.activeTheory) return;
     for (let i = 0; i < game.activeTheory.milestoneUpgrades.length; i++) {
         if (i == 0 && theoryManager?.id == 7) continue;
@@ -1351,9 +1287,7 @@ var buyMilestones = () => {
     }
 };
 
-var switchTheory = (manual = false) => {
-    if (!state.enableTheorySwitch && !manual) return;
-
+var switchTheory = () => {
     let iMax = -1;
     let max = 0;
     for (let i = 0; i < Math.min(8, game.researchUpgrades[7].level); i++) {
@@ -1363,7 +1297,6 @@ var switchTheory = (manual = false) => {
             max = value;
         }
     }
-
     if (iMax >= 0) game.activeTheory = game.theories[iMax];
 };
 

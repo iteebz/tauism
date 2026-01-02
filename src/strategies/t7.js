@@ -18,9 +18,12 @@ class T7 extends BaseStrategy {
         this.coast = this.pub / 10;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    getScheduleDisplay() {
+        return "Ratio\\ buying:\\ c_1..c_6";
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
 
         const c6cost = this.c6.isAvailable ? upgradeCost(this.c6) : parseBigNumber("ee999999");
         const c5cost = this.c5.isAvailable ? upgradeCost(this.c5) : parseBigNumber("ee999999");
@@ -41,12 +44,12 @@ class T7 extends BaseStrategy {
         return this.theory.tau >= this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }

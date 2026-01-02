@@ -18,16 +18,18 @@ class T8 extends BaseStrategy {
         this.coast = this.pub / 4;
     }
 
-    buyMilestones(state) {
-        if (!state.enableMSPurchase) return;
+    buyMilestones() {
         for (let i = 1; i < this.theory.milestoneUpgrades.length; i++) {
             this.theory.milestoneUpgrades[i].buy(-1);
         }
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    getScheduleDisplay() {
+        return "Ratio\\ buying:\\ c_1..c_5";
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
 
         const c5cost = upgradeCost(this.c5);
         const c4cost = upgradeCost(this.c4);
@@ -50,13 +52,13 @@ class T8 extends BaseStrategy {
         return this.theory.tau >= this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        this.buyMilestones(state);
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        this.buyMilestones();
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }

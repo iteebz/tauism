@@ -55,32 +55,31 @@ class T2 extends BaseStrategy {
         return s;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
+    buy() {
         this.updateSchedule();
 
-        if (this.pubMultiplier >= this.qr1 && state.enablePublications) {
+        if (this.pubMultiplier >= this.qr1) {
             this.phase = 5;
             return;
         }
         this.upgrades[0].buy(-1);
         this.upgrades[4].buy(-1);
 
-        if (this.pubMultiplier >= this.qr2 && state.enablePublications) {
+        if (this.pubMultiplier >= this.qr2) {
             this.phase = 4;
             return;
         }
         this.upgrades[1].buy(-1);
         this.upgrades[5].buy(-1);
 
-        if (this.pubMultiplier >= this.qr3 && state.enablePublications) {
+        if (this.pubMultiplier >= this.qr3) {
             this.phase = 3;
             return;
         }
         this.upgrades[2].buy(-1);
         this.upgrades[6].buy(-1);
 
-        if (this.pubMultiplier >= this.qr4 && state.enablePublications) {
+        if (this.pubMultiplier >= this.qr4) {
             this.phase = 2;
             return;
         }
@@ -92,12 +91,12 @@ class T2 extends BaseStrategy {
         return this.pubMultiplier > this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }

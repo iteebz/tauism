@@ -88,9 +88,8 @@ class T1 extends BaseStrategy {
         return s;
     }
 
-    buy(state) {
-        if (!state.enableVariablePurchase) return;
-        if (this.theory.tau >= this.coast && state.enablePublications) return;
+    buy() {
+        if (this.theory.tau >= this.coast) return;
 
         let refresh = false;
         if (buyRatio(this.q1, 50)) refresh = true;
@@ -126,12 +125,12 @@ class T1 extends BaseStrategy {
         return this.theory.tau > this.pub;
     }
 
-    tick(elapsedTime, multiplier, state) {
-        if (state.enablePublications && this.shouldPublish()) {
+    tick(elapsedTime, multiplier) {
+        if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
-        this.buy(state);
+        this.buy();
         return false;
     }
 }

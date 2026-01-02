@@ -14,18 +14,14 @@ var tick = (elapsedTime, multiplier) => {
 
     if (state.shouldReallocate && game.statistics.tickCount % state.autoFreq == 0) {
         AllocUtils.simpleStar();
-        AllocUtils.simpleStudent(state.useR9);
-        if (state.enableTheorySwitch) {
-            switchTheory();
-        }
+        AllocUtils.simpleStudent(true);
+        switchTheory();
     }
 
     if (theoryManager) {
         buyMilestones();
-        const published = theoryManager.tick(elapsedTime, multiplier, state);
-        if (published) {
-            refreshTheoryManager();
-        }
+        const published = theoryManager.tick(elapsedTime, multiplier);
+        if (published) refreshTheoryManager();
     }
 
     theory.invalidatePrimaryEquation();
@@ -33,7 +29,6 @@ var tick = (elapsedTime, multiplier) => {
 };
 
 var buyMilestones = () => {
-    if (!state.enableMSPurchase) return;
     if (!game.activeTheory) return;
     for (let i = 0; i < game.activeTheory.milestoneUpgrades.length; i++) {
         if (i == 0 && theoryManager?.id == 7) continue;
@@ -41,9 +36,7 @@ var buyMilestones = () => {
     }
 };
 
-var switchTheory = (manual = false) => {
-    if (!state.enableTheorySwitch && !manual) return;
-
+var switchTheory = () => {
     let iMax = -1;
     let max = 0;
     for (let i = 0; i < Math.min(8, game.researchUpgrades[7].level); i++) {
@@ -53,7 +46,6 @@ var switchTheory = (manual = false) => {
             max = value;
         }
     }
-
     if (iMax >= 0) game.activeTheory = game.theories[iMax];
 };
 
