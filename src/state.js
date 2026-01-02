@@ -1,6 +1,6 @@
 import { MIN_ALLOC_FREQ } from './config.js';
 
-export const state = {
+var state = {
     useR9: false,
     autoFreq: 42,
     enableVariablePurchase: true,

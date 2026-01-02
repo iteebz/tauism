@@ -1,6 +1,6 @@
 import { toBig, buyMax, buyRatio, upgradeCost } from '../utils/buy.js';
 
-export class BaseStrategy {
+class BaseStrategy {
     constructor(id) {
         this.id = id;
         this.theory = game.activeTheory;
@@ -24,4 +24,4 @@ export class BaseStrategy {
     }
 }
 
-export { toBig, buyMax, buyRatio, upgradeCost };
+

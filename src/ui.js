@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { AllocUtils } from './utils/alloc.js';
 import { MIN_ALLOC_FREQ } from './config.js';
 
-export const createCurrencyBar = () => {
+var createCurrencyBar = () => {
     const starBtn = ui.createButton({
         text: "Reallocate ★",
         onClicked: () => AllocUtils.simpleStar()

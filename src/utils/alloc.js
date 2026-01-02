@@ -1,4 +1,4 @@
-export class AllocUtils {
+class AllocUtils {
     static simpleStar() {
         const starUps = Array.from(game.starBonuses).filter(x => x.id >= 4000 && x.id < 5000 && x.isAvailable);
         const variables = Array.from(game.variables).filter(x => x.id > 0 && x.isAvailable);

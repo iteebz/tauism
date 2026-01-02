@@ -1,6 +1,6 @@
 import { BaseStrategy, buyRatio } from './base.js';
 
-export class T3 extends BaseStrategy {
+class T3 extends BaseStrategy {
     constructor() {
         super(2);
         this.b1 = this.upgrades[0];

@@ -1,6 +1,6 @@
 import { BaseStrategy } from './base.js';
 
-export class T2 extends BaseStrategy {
+class T2 extends BaseStrategy {
     constructor() {
         super(1);
         this.pub = 8000;
