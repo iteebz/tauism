@@ -1,16 +1,3 @@
-import { state } from './state.js';
-import { createStrategy } from './strategies/index.js';
-import { AllocUtils } from './utils/alloc.js';
-import { createCurrencyBar } from './ui.js';
-import { OVERPUSH, TAU_REQUIREMENTS, TAU_DECAY, TAU_TIME_MULT, TAU_BASE, MIN_ALLOC_FREQ } from './config.js';
-
-var id = "tauism";
-var name = "Tauism";
-var description = "The doctrine of tau maximization. Overpush strategies + star/student optimization.";
-var authors = "tauism";
-var version = "0.1.0";
-var permissions = Permissions.PERFORM_GAME_ACTIONS;
-
 var theoryManager = null;
 var R9 = 1;
 

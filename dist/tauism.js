@@ -1,3 +1,10 @@
+var id = "tauism";
+var name = "Tauism";
+var description = "The doctrine of tau maximization. Overpush strategies + star/student optimization.";
+var authors = "tauism";
+var version = "0.1.0";
+var permissions = Permissions.PERFORM_GAME_ACTIONS;
+
 var THEORY_COUNT = 8;
 var OVERPUSH = [1, 10, 1, 1.4, 1, 3, 1, 1];
 var TAU_REQUIREMENTS = [150, 250, 175, 175, 150, 150, 175, 220];
@@ -1301,14 +1308,6 @@ const showFreqPopup = () => {
 
     popup.show();
 };
-
-var id = "tauism";
-var name = "Tauism";
-var description = "The doctrine of tau maximization. Overpush strategies + star/student optimization.";
-var authors = "tauism";
-var version = "0.1.0";
-var permissions = Permissions.PERFORM_GAME_ACTIONS;
-
 var theoryManager = null;
 var R9 = 1;
 
