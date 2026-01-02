@@ -37,10 +37,11 @@ var buyMilestones = () => {
 };
 
 var switchTheory = () => {
+    getQuaternaryEntries();
     let iMax = -1;
     let max = 0;
     for (let i = 0; i < Math.min(8, game.researchUpgrades[7].level); i++) {
-        const value = parseFloat(formatQValue(getTauH(i))) * OVERPUSH[i];
+        const value = parseFloat(quaternaryEntries[i].value) * OVERPUSH[i];
         if (value > max) {
             iMax = i;
             max = value;
@@ -90,6 +91,21 @@ var getQuaternaryEntries = () => {
     for (let i = game.researchUpgrades[7].level; i < 8; i++) {
         quaternaryEntries[i].value = formatQValue(0);
     }
+
+    if (game.researchUpgrades[7].level >= 4) {
+        let tau;
+        try { tau = game.theories[3].tauPublished.log10(); } catch (e) { tau = 1; }
+        const tauH = 1.51 * R9 / 2 ** ((tau - TAU_REQUIREMENTS[3]) / 27.0085302950228);
+        quaternaryEntries[3].value = formatQValue(Math.max(tauH, parseFloat(quaternaryEntries[3].value)));
+    }
+
+    if (game.researchUpgrades[7].level >= 6) {
+        let tau;
+        try { tau = game.theories[5].tauPublished.log10(); } catch (e) { tau = 1; }
+        const tauH = 7 * R9 ** 0.5 / 2 ** ((tau - TAU_REQUIREMENTS[5]) / 70.0732254255212);
+        quaternaryEntries[5].value = formatQValue(Math.max(tauH, parseFloat(quaternaryEntries[5].value)));
+    }
+
     return quaternaryEntries;
 };
 
