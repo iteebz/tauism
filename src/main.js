@@ -15,6 +15,9 @@ var tick = (elapsedTime, multiplier) => {
     if (state.shouldReallocate && game.statistics.tickCount % state.autoFreq == 0) {
         AllocUtils.simpleStar();
         AllocUtils.simpleStudent(state.useR9);
+        if (state.enableTheorySwitch) {
+            switchTheory();
+        }
     }
 
     if (theoryManager) {
@@ -22,7 +25,6 @@ var tick = (elapsedTime, multiplier) => {
         const published = theoryManager.tick(elapsedTime, multiplier, state);
         if (published) {
             refreshTheoryManager();
-            switchTheory();
         }
     }
 
