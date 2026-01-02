@@ -128,7 +128,7 @@ class T3 extends BaseStrategy {
             }
         }
         if (this.scheduledUpgrades2.length) {
-            if (s) s += "\\ \\ ";
+            if (s) s += "\\\\";
             s += "\\rho_2: ";
             for (let i = 0; i < Math.min(this.scheduledUpgrades2.length, 3); i++) {
                 if (this.scheduledUpgrades2[i][1] > 1) s += this.scheduledUpgrades2[i][1];
@@ -137,7 +137,7 @@ class T3 extends BaseStrategy {
             }
         }
         if (this.scheduledUpgrades3.length) {
-            if (s) s += "\\ \\ ";
+            if (s) s += "\\\\";
             s += "\\rho_3: ";
             for (let i = 0; i < Math.min(this.scheduledUpgrades3.length, 3); i++) {
                 if (this.scheduledUpgrades3[i][1] > 1) s += this.scheduledUpgrades3[i][1];
