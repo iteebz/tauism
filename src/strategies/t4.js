@@ -140,6 +140,8 @@ class T4 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades.length === 0) this.updateSchedule();
+
         if (this.theory.tau >= this.coast) return;
         if (this.theory.currencies[0].value == 0) this.c1.buy(1);
 

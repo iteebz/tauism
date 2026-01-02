@@ -149,6 +149,10 @@ class T3 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades1.length === 0) this.updateSchedule1();
+        if (this.scheduledUpgrades2.length === 0) this.updateSchedule2();
+        if (this.scheduledUpgrades3.length === 0) this.updateSchedule3();
+
         const prevPhase = this.phase;
         if (this.pubMultiplier > this.phase3) this.phase = 4;
         else if (this.pubMultiplier > this.phase2) this.phase = 3;

@@ -444,6 +444,8 @@ class T1 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades.length === 0) this.updateSchedule();
+
         if (this.theory.tau >= this.coast) return;
 
         let refresh = false;
@@ -740,6 +742,10 @@ class T3 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades1.length === 0) this.updateSchedule1();
+        if (this.scheduledUpgrades2.length === 0) this.updateSchedule2();
+        if (this.scheduledUpgrades3.length === 0) this.updateSchedule3();
+
         const prevPhase = this.phase;
         if (this.pubMultiplier > this.phase3) this.phase = 4;
         else if (this.pubMultiplier > this.phase2) this.phase = 3;
@@ -941,6 +947,8 @@ class T4 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades.length === 0) this.updateSchedule();
+
         if (this.theory.tau >= this.coast) return;
         if (this.theory.currencies[0].value == 0) this.c1.buy(1);
 
@@ -1109,6 +1117,8 @@ class T5 extends BaseStrategy {
     }
 
     buy(multiplier) {
+        if (this.scheduledUpgrades.length === 0) this.updateSchedule();
+
         if (this.theory.tau >= this.coast) return;
 
         let refresh = false;
@@ -1294,6 +1304,8 @@ class T6 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades.length === 0) this.updateSchedule();
+
         if (this.theory.tau >= this.coast) return;
 
         let refresh = false;
@@ -1438,6 +1450,8 @@ class T7 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades.length === 0) this.updateSchedule();
+
         if (this.theory.tau >= this.coast) return;
 
         const q1level = this.q1.level;
@@ -1573,6 +1587,8 @@ class T8 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades.length === 0) this.updateSchedule();
+
         if (this.theory.tau >= this.coast) return;
 
         let refresh = false;

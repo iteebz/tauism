@@ -77,6 +77,8 @@ class T7 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades.length === 0) this.updateSchedule();
+
         if (this.theory.tau >= this.coast) return;
 
         const q1level = this.q1.level;

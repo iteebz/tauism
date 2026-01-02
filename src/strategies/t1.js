@@ -89,6 +89,8 @@ class T1 extends BaseStrategy {
     }
 
     buy() {
+        if (this.scheduledUpgrades.length === 0) this.updateSchedule();
+
         if (this.theory.tau >= this.coast) return;
 
         let refresh = false;
