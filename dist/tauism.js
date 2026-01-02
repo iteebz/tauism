@@ -328,22 +328,6 @@ class AllocUtils {
 }
 
 AllocUtils.MAX_DFS_SIZE = 300;
-var state = {
-    autoFreq: 42,
-
-    get shouldReallocate() {
-        return this.autoFreq >= 10;
-    },
-
-    serialize() {
-        return JSON.stringify({ autoFreq: this.autoFreq });
-    },
-
-    deserialize(s) {
-        if (!s) return;
-        try { Object.assign(this, JSON.parse(s)); } catch (e) {}
-    }
-};
 
 class BaseStrategy {
     constructor(id) {
@@ -992,7 +976,6 @@ class T4 extends BaseStrategy {
         return false;
     }
 }
-
 class T5 extends BaseStrategy {
     constructor() {
         super(4);
@@ -1002,36 +985,171 @@ class T5 extends BaseStrategy {
         this.c2 = this.upgrades[3];
         this.c3 = this.upgrades[4];
         this.setPub();
+        this.scheduledUpgrades = [];
+        this.scheduledLevels = [0, 0, 0, 0];
+    }
+
+    get q() {
+        return parseBigNumber(this.theory.tertiaryEquation.substring(2)).max(Number.MIN_VALUE);
+    }
+
+    get getC1() {
+        return Utils.getStepwisePowerSum(this.c1.level, 2, 10, 1);
+    }
+
+    get getC2() {
+        return toBig(2).pow(this.c2.level);
+    }
+
+    get getC3() {
+        return toBig(2).pow(this.c3.level * (1 + 0.05 * this.theory.milestoneUpgrades[2].level));
+    }
+
+    predictQ(multiplier) {
+        let vc2 = this.getC2;
+        let vc3 = this.getC3;
+        let q = this.q;
+        let dqPred = (this.getC1 / vc2 * q * (vc3 - q / vc2)) * multiplier;
+        let qPred = q + dqPred.max(0);
+        qPred = qPred.min(vc2 * vc3);
+        return qPred;
+    }
+
+    upgradeByIndex(idx) {
+        return [this.q1, this.q2, this.c2, this.c3][idx];
+    }
+
+    updateSchedule() {
+        if (this.scheduledUpgrades.length >= 6) return false;
+        const veryBig = parseBigNumber("ee999999");
+
+        while (this.scheduledUpgrades.length < 6) {
+            let costs = [
+                this.q1.cost.getCost(this.q1.level + this.scheduledLevels[0]) * (5.5 + ((this.q1.level + this.scheduledLevels[0]) % 10) * 0.35),
+                this.q2.cost.getCost(this.q2.level + this.scheduledLevels[1]),
+                this.c2.cost.getCost(this.c2.level + this.scheduledLevels[2]),
+                this.c3.cost.getCost(this.c3.level + this.scheduledLevels[3])
+            ];
+            if (costs[0] > this.pub * 0.28) costs[0] = veryBig;
+
+            let minCost = [veryBig, null];
+            for (let i = 0; i < costs.length; i++) {
+                if (costs[i] < minCost[0]) minCost = [costs[i], i];
+            }
+
+            const upgrade = this.upgradeByIndex(minCost[1]);
+            const cost = upgrade.cost.getCost(upgrade.level + this.scheduledLevels[minCost[1]]);
+            if (cost >= this.coast) break;
+
+            if (minCost[1] != null) {
+                this.scheduledLevels[minCost[1]]++;
+                const last = this.scheduledUpgrades[this.scheduledUpgrades.length - 1];
+                if (last && last[0] == minCost[1]) last[1]++;
+                else this.scheduledUpgrades.push([minCost[1], 1]);
+            } else break;
+        }
+        return true;
+    }
+
+    getScheduleDisplay() {
+        let s = "";
+        if (this.scheduledUpgrades.length) {
+            s = "Next: ";
+            for (let i = 0; i < Math.min(this.scheduledUpgrades.length, 5); i++) {
+                if (this.scheduledUpgrades[i][1] > 1) s += this.scheduledUpgrades[i][1];
+                s += this.scheduledUpgrades[i][0] <= 1 ? "q_" + (this.scheduledUpgrades[i][0] + 1) : "c_" + this.scheduledUpgrades[i][0];
+                if (i + 1 < Math.min(this.scheduledUpgrades.length, 5)) s += ", ";
+            }
+        }
+        return s || "Scheduling...";
+    }
+
+    c3CostNext(rho) {
+        if (rho < 1000) return toBig(1000);
+        return toBig(88550700).pow(((rho / 1000).log2() / Math.log2(88550700)).ceil()) * 1000;
+    }
+
+    q2Cost(rho) {
+        if (rho < 15) return toBig(0);
+        return toBig(64).pow(((rho / 15).log2() / 6).floor()) * 15;
     }
 
     setPub() {
         const lastPub = this.theory.tauPublished;
-        this.pub = lastPub * (lastPub < toBig("e150") ? 25 : 5);
-        this.coast = this.pub / 10;
-    }
+        let c3Next = this.c3CostNext(lastPub);
+        let q2Near = this.q2Cost(c3Next);
+        const ratio = 9.5;
 
-    getScheduleDisplay() {
-        return "Ratio\\ buying:\\ q,c";
-    }
-
-    buy() {
-        if (this.theory.tau >= this.coast) return;
-
-        const c1cost = upgradeCost(this.c1);
-        buyMax(this.c3, c1cost);
-        buyMax(this.c2, c1cost);
-
-        const q2cost = upgradeCost(this.q2);
-        if (q2cost / 5 < c1cost) {
-            buyMax(this.q2, this.theory.currencies[0].value);
-            buyMax(this.q1, q2cost / 10);
+        while (c3Next / q2Near >= ratio) {
+            c3Next *= 88550700;
+            q2Near = this.q2Cost(c3Next);
         }
 
-        buyMax(this.c1, this.theory.currencies[0].value);
+        let counter = 1;
+        let c3Prev = c3Next / 88550700;
+        let q2NearP = this.q2Cost(c3Prev);
+        while (c3Prev / q2NearP >= ratio && c3Prev > 0) {
+            c3Prev /= 88550700;
+            q2NearP = this.q2Cost(c3Prev);
+            counter++;
+        }
+
+        const target = 105;
+        const step = (c3Next / (ratio * c3Prev * target)).pow(1 / (counter * 3 - 1));
+        this.pub = c3Prev * target;
+        while (lastPub * 64 >= this.pub) {
+            this.pub *= step;
+        }
+
+        if (this.pub > c3Next) {
+            this.pub = c3Next * target;
+        }
+
+        this.coast = this.pub / 2;
     }
 
-    shouldPublish() {
-        return this.theory.tau >= this.pub;
+    buy(multiplier) {
+        if (this.theory.tau >= this.coast) return;
+
+        let refresh = false;
+        if (buyRatio(this.q1, 100)) refresh = true;
+        if (buyRatio(this.q2, 4)) refresh = true;
+        if (buyRatio(this.c1, 10000)) refresh = true;
+        if (buyRatio(this.c3, 2)) refresh = true;
+
+        const veryBig = parseBigNumber("ee999999");
+
+        for (let i = 0; i < 40; i++) {
+            const c2worth = this.predictQ(multiplier) >= this.getC3 * this.getC2 * 2 / 3;
+
+            let costs = [
+                upgradeCost(this.q1) * (5.5 + (this.q1.level % 10) * 0.35),
+                upgradeCost(this.q2),
+                c2worth ? veryBig : upgradeCost(this.c1) * 2,
+                c2worth ? upgradeCost(this.c2) : veryBig,
+                upgradeCost(this.c3)
+            ];
+            if (costs[0] > this.pub * 0.28) costs[0] = veryBig;
+
+            let minCost = [veryBig, null];
+            for (let j = 0; j < costs.length; j++) {
+                if (costs[j] < minCost[0]) minCost = [costs[j], j];
+            }
+            if (minCost[1] == null) break;
+
+            const upgrade = [this.q1, this.q2, this.c1, this.c2, this.c3][minCost[1]];
+
+            if (upgradeCost(upgrade) <= this.theory.currencies[0].value) {
+                upgrade.buy(1);
+                refresh = true;
+            } else break;
+        }
+
+        if (this.theory.currencies[0].value > this.theory.tauPublished / 1e20 && refresh) {
+            this.scheduledUpgrades = [];
+            this.scheduledLevels = [0, 0, 0, 0];
+            this.updateSchedule();
+        }
     }
 
     tick(elapsedTime, multiplier) {
@@ -1039,8 +1157,12 @@ class T5 extends BaseStrategy {
             this.theory.publish();
             return true;
         }
-        this.buy();
+        this.buy(multiplier);
         return false;
+    }
+
+    shouldPublish() {
+        return this.theory.tau >= this.pub;
     }
 }
 
@@ -1053,42 +1175,176 @@ class T6 extends BaseStrategy {
         this.r2 = this.upgrades[3];
         this.c1 = this.upgrades[4];
         this.c2 = this.upgrades[5];
-        this.c3 = this.upgrades[6];
-        this.c4 = this.upgrades[7];
         this.c5 = this.upgrades[8];
         this.setPub();
+        this.ratio = (this.getMaxC5 * this.r / 2) / (this.getC1 * this.getC2);
+        this.scheduledUpgrades = [];
+        this.scheduledLevels = [0, 0, 0, 0, 0, 0, 0];
     }
 
-    setPub() {
-        const lastPub = this.theory.tauPublished;
-        this.pub = lastPub * 20;
-        this.coast = this.pub / 100;
+    get getC1() {
+        return Utils.getStepwisePowerSum(this.c1.level, 2, 10, 1).pow(1 + this.theory.milestoneUpgrades[3].level * 0.05);
+    }
+
+    get getC2() {
+        return toBig(2).pow(this.c2.level);
+    }
+
+    get maxRho() {
+        let max = toBig(0);
+        for (let i = 0; i < this.upgrades.length; i++) {
+            const upgrade = this.upgrades[i];
+            if (upgrade.level) {
+                const cost = upgrade.cost.getCost(upgrade.level - 1);
+                max = max.max(cost);
+            }
+        }
+        return max.max(this.theory.currencies[0].value);
+    }
+
+    get getMaxC5() {
+        const rho = this.maxRho;
+        if (rho < 15) return 0;
+        return toBig(2).pow((rho / 15).log2() / Math.log2(3.9));
+    }
+
+    get r() {
+        const string = this.theory.tertiaryEquation;
+        const begin = string.indexOf("r=");
+        const end = string.indexOf(",", begin);
+        return parseBigNumber(string.substring(begin + 2, end)).max(Number.MIN_VALUE);
+    }
+
+    upgradeByIndex(idx) {
+        return [this.q1, this.q2, this.r1, this.r2, this.c1, this.c2, this.c5][idx];
+    }
+
+    updateSchedule() {
+        if (this.scheduledUpgrades.length >= 6) return false;
+        const veryBig = parseBigNumber("ee999999");
+        const rHalf = this.r / 2;
+
+        while (this.scheduledUpgrades.length < 6) {
+            const k = (this.getMaxC5 * rHalf) / (this.getC1 * this.getC2);
+            const c1w = this.c1.cost.getCost(this.c1.level + this.scheduledLevels[4]) * (8 + this.c1.level % 10);
+            const c2cost = this.c2.cost.getCost(this.c2.level + this.scheduledLevels[5]);
+            const q2cost = this.q2.cost.getCost(this.q2.level + this.scheduledLevels[1]);
+            const r2cost = this.r2.cost.getCost(this.r2.level + this.scheduledLevels[3]);
+            const c2weight = (c2cost * 2 ** 0.5 > r2cost.min(q2cost)) ? 2 ** 0.5 : 1;
+
+            const costs = [
+                this.q1.cost.getCost(this.q1.level + this.scheduledLevels[0]) * (7 + (this.q1.level % 10) / 2),
+                q2cost,
+                this.r1.cost.getCost(this.r1.level + this.scheduledLevels[2]) * (2 + (this.r1.level % 10) / 4),
+                r2cost,
+                c1w < c2cost ? c1w : veryBig,
+                c2cost * k.max(1) * c2weight,
+                this.c5.cost.getCost(this.c5.level + this.scheduledLevels[6]) / k.max(Number.MIN_VALUE).min(1)
+            ];
+
+            let minCost = [veryBig, null];
+            for (let i = 0; i < costs.length; i++) {
+                if (costs[i] < minCost[0]) minCost = [costs[i], i];
+            }
+
+            const upgrade = this.upgradeByIndex(minCost[1]);
+            const cost = upgrade.cost.getCost(upgrade.level + this.scheduledLevels[minCost[1]]);
+            if (cost >= this.coast) break;
+
+            if (minCost[1] != null) {
+                this.scheduledLevels[minCost[1]]++;
+                const last = this.scheduledUpgrades[this.scheduledUpgrades.length - 1];
+                if (last && last[0] == minCost[1]) last[1]++;
+                else this.scheduledUpgrades.push([minCost[1], 1]);
+            } else break;
+        }
+        return true;
     }
 
     getScheduleDisplay() {
-        return "Ratio\\ buying:\\ q,r,c";
+        if (!this.scheduledUpgrades.length) return "Scheduling...";
+        let s = "Next: ";
+        for (let i = 0; i < Math.min(this.scheduledUpgrades.length, 5); i++) {
+            if (this.scheduledUpgrades[i][1] > 1) s += this.scheduledUpgrades[i][1];
+            const idx = this.scheduledUpgrades[i][0];
+            if (idx <= 1) s += "q_" + (idx + 1);
+            else if (idx <= 3) s += "r_" + (idx - 1);
+            else if (idx <= 5) s += "c_" + (idx - 3);
+            else s += "c_5";
+            if (i + 1 < Math.min(this.scheduledUpgrades.length, 5)) s += ", ";
+        }
+        return s;
+    }
+
+    c5Cost(rho) {
+        if (rho < 15) return toBig(0);
+        return toBig(3.9).pow(((rho / 15).log2() / Math.log2(3.9)).floor()) * 15;
+    }
+
+    setPub() {
+        const lastPub = this.theory.tauPublished.log10().toNumber();
+        let target;
+        if (lastPub % 10 < 3) target = Math.floor(lastPub / 10) * 10 + 7 + Math.log10(3);
+        else if (lastPub % 10 < 6) target = Math.floor(lastPub / 10) * 10 + 11 + Math.log10(5);
+        else target = Math.floor(lastPub / 10) * 10 + 14;
+
+        const c5Near = this.c5Cost(toBig(10).pow(target));
+        this.pub = c5Near * 4.2;
+        this.coast = this.pub / 4;
     }
 
     buy() {
         if (this.theory.tau >= this.coast) return;
 
-        const c5cost = this.c5.isAvailable ? upgradeCost(this.c5) : parseBigNumber("ee999999");
-        const c4cost = this.c4.isAvailable ? upgradeCost(this.c4) : parseBigNumber("ee999999");
+        let refresh = false;
+        if (buyRatio(this.r2, 10)) refresh = true;
+        if (buyRatio(this.q2, 10)) refresh = true;
+        if (buyRatio(this.r1, 100)) refresh = true;
+        if (buyRatio(this.q1, 100)) refresh = true;
+        if (buyRatio(this.c5, 100)) refresh = true;
+        if (buyRatio(this.c2, 10000)) refresh = true;
+        if (buyRatio(this.c1, 100000)) refresh = true;
 
-        buyMax(this.c3, c4cost.min(c5cost));
-        buyMax(this.c2, c4cost.min(c5cost));
-        buyMax(this.c5, this.theory.currencies[1].value);
-        buyMax(this.c4, this.theory.currencies[1].value);
-        buyMax(this.c1, c4cost.min(c5cost) / 10);
+        const rHalf = this.r / 2;
+        const veryBig = parseBigNumber("ee999999");
+        let k = 1;
 
-        const q2cost = upgradeCost(this.q2);
-        const r2cost = upgradeCost(this.r2);
-        const qrmin = q2cost.min(r2cost);
+        for (let n = 0; n < 50; n++) {
+            k = (this.getMaxC5 * rHalf) / (this.getC1 * this.getC2);
+            const c1w = upgradeCost(this.c1) * (8 + this.c1.level % 10);
+            const c2cost = upgradeCost(this.c2);
+            const c2weight = (c2cost * 2 ** 0.5 > upgradeCost(this.r2).min(upgradeCost(this.q2))) ? 2 ** 0.5 : 1;
 
-        buyMax(this.q2, this.theory.currencies[0].value);
-        buyMax(this.r2, this.theory.currencies[0].value);
-        buyMax(this.q1, qrmin / 8);
-        buyMax(this.r1, qrmin / 8);
+            const costs = [
+                upgradeCost(this.q1) * (7 + (this.q1.level % 10) / 2),
+                upgradeCost(this.q2),
+                upgradeCost(this.r1) * (2 + (this.r1.level % 10) / 4),
+                upgradeCost(this.r2),
+                c1w < c2cost ? c1w : veryBig,
+                c2cost * k.max(1) * c2weight,
+                veryBig,
+                veryBig,
+                upgradeCost(this.c5) / k.max(Number.MIN_VALUE).min(1)
+            ];
+
+            let minCost = [veryBig, null];
+            for (let i = 0; i < 9; i++) {
+                if (costs[i] < minCost[0]) minCost = [costs[i], i];
+            }
+
+            if (minCost[1] != null && upgradeCost(this.upgrades[minCost[1]]) <= this.theory.currencies[0].value) {
+                this.upgrades[minCost[1]].buy(1);
+                refresh = true;
+            } else break;
+        }
+
+        this.ratio = k;
+
+        if (this.theory.currencies[0].value > this.theory.tauPublished / 1e20 && refresh) {
+            this.scheduledUpgrades = [];
+            this.scheduledLevels = [0, 0, 0, 0, 0, 0, 0];
+            this.updateSchedule();
+        }
     }
 
     shouldPublish() {
@@ -1108,41 +1364,121 @@ class T6 extends BaseStrategy {
 class T7 extends BaseStrategy {
     constructor() {
         super(6);
-        this.c1 = this.upgrades[0];
-        this.c2 = this.upgrades[1];
-        this.c3 = this.upgrades[2];
-        this.c4 = this.upgrades[3];
-        this.c5 = this.upgrades[4];
-        this.c6 = this.upgrades[5];
+        this.q1 = this.upgrades[0];
+        this.c1 = this.upgrades[1];
+        this.c2 = this.upgrades[2];
+        this.c3 = this.upgrades[3];
+        this.c4 = this.upgrades[4];
+        this.c5 = this.upgrades[5];
+        this.c6 = this.upgrades[6];
         this.setPub();
+        this.scheduledUpgrades = [];
+        this.scheduledLevels = [0, 0, 0, 0, 0];
+    }
+
+    c6CostNext(rho) {
+        if (rho < 100) return toBig(100);
+        return toBig(2.81).pow(((rho / 100).log2() / Math.log2(2.81)).ceil()) * 100;
     }
 
     setPub() {
         const lastPub = this.theory.tauPublished;
-        this.pub = lastPub * 4;
-        this.coast = this.pub / 10;
+        let c6Next = this.c6CostNext(lastPub);
+        c6Next *= 2.81 ** 5;
+        this.pub = c6Next * 1.03;
+        if (this.pub / lastPub < 491) this.pub *= 2.81;
+        this.coast = this.pub / 2;
+    }
+
+    upgradeByIndex(idx) {
+        return [this.q1, this.c3, this.c4, this.c5, this.c6][idx];
+    }
+
+    updateSchedule() {
+        if (this.scheduledUpgrades.length >= 25) return false;
+        const veryBig = parseBigNumber("ee999999");
+
+        while (this.scheduledUpgrades.length < 25) {
+            const costs = [
+                this.q1.cost.getCost(this.q1.level + this.scheduledLevels[0]) * 4,
+                this.c3.cost.getCost(this.c3.level + this.scheduledLevels[1]) * 10,
+                this.c4.cost.getCost(this.c4.level + this.scheduledLevels[2]) * 10,
+                this.c5.cost.getCost(this.c5.level + this.scheduledLevels[3]) * 4,
+                this.c6.cost.getCost(this.c6.level + this.scheduledLevels[4])
+            ];
+
+            let minCost = [veryBig, null];
+            for (let i = 0; i < costs.length; i++) {
+                if (costs[i] < minCost[0]) minCost = [costs[i], i];
+            }
+
+            const upgrade = this.upgradeByIndex(minCost[1]);
+            const cost = upgrade.cost.getCost(upgrade.level + this.scheduledLevels[minCost[1]]);
+            if (cost >= this.coast) break;
+
+            if (minCost[1] != null) {
+                this.scheduledLevels[minCost[1]]++;
+                const last = this.scheduledUpgrades[this.scheduledUpgrades.length - 1];
+                if (last && last[0] == minCost[1]) last[1]++;
+                else this.scheduledUpgrades.push([minCost[1], 1]);
+            } else break;
+        }
+        return true;
     }
 
     getScheduleDisplay() {
-        return "Ratio\\ buying:\\ c_1..c_6";
+        if (!this.scheduledUpgrades.length) return "Scheduling...";
+        let s = "Next: ";
+        for (let i = 0; i < Math.min(this.scheduledUpgrades.length, 5); i++) {
+            if (this.scheduledUpgrades[i][1] > 1) s += this.scheduledUpgrades[i][1];
+            s += this.scheduledUpgrades[i][0] == 0 ? "q_1" : "c_" + (this.scheduledUpgrades[i][0] + 2);
+            if (i + 1 < Math.min(this.scheduledUpgrades.length, 5)) s += ", ";
+        }
+        return s;
     }
 
     buy() {
         if (this.theory.tau >= this.coast) return;
 
-        const c6cost = this.c6.isAvailable ? upgradeCost(this.c6) : parseBigNumber("ee999999");
-        const c5cost = this.c5.isAvailable ? upgradeCost(this.c5) : parseBigNumber("ee999999");
-        const c4cost = this.c4.isAvailable ? upgradeCost(this.c4) : parseBigNumber("ee999999");
-        const c3cost = upgradeCost(this.c3);
+        const q1level = this.q1.level;
+        const c6level = this.c6.level;
 
-        const minCost = c3cost.min(c4cost).min(c5cost).min(c6cost);
+        let refresh = false;
+        if (buyRatio(this.q1, 10)) refresh = true;
+        if (buyRatio(this.c3, 20)) refresh = true;
+        if (buyRatio(this.c4, 20)) refresh = true;
+        if (buyRatio(this.c5, 10)) refresh = true;
+        if (buyRatio(this.c6, 2)) refresh = true;
 
-        buyMax(this.c6, this.theory.currencies[0].value);
-        buyMax(this.c5, this.theory.currencies[0].value);
-        buyMax(this.c4, this.theory.currencies[0].value);
-        buyMax(this.c3, this.theory.currencies[0].value);
-        buyMax(this.c2, minCost / 100);
-        buyMax(this.c1, minCost / 100);
+        if (refresh) {
+            this.scheduledUpgrades = [];
+            this.scheduledLevels = [0, 0, 0, 0, 0];
+        }
+
+        let bought = false;
+        while (this.scheduledUpgrades.length) {
+            const idx = this.scheduledUpgrades[0][0];
+            const upgrade = this.upgradeByIndex(idx);
+            const before = upgrade.level;
+            upgrade.buy(1);
+            if (before == upgrade.level) break;
+
+            bought = true;
+            this.scheduledUpgrades[0][1]--;
+            this.scheduledLevels[idx]--;
+            if (this.scheduledUpgrades[0][1] <= 0) this.scheduledUpgrades.shift();
+        }
+
+        if (this.theory.currencies[0].value < this.theory.tauPublished / 1e20) return;
+        if (this.updateSchedule() || bought) {}
+
+        if (this.theory.currencies[0].value < this.theory.tauPublished / 1e11) return;
+        if (this.theory.currencies[0].value * 4 >= this.c6.cost.getCost(this.c6.level)) return;
+
+        if (q1level < this.q1.level || c6level < this.c6.level) {
+            this.c1.buy(-1);
+            this.c2.buy(-1);
+        }
     }
 
     shouldPublish() {
@@ -1168,13 +1504,109 @@ class T8 extends BaseStrategy {
         this.c4 = this.upgrades[3];
         this.c5 = this.upgrades[4];
         this.setPub();
-        this.lastC5 = this.c5.level;
+        this.resetAttractor();
+        this.scheduledUpgrades = [];
+        this.scheduledLevels = [0, 0, 0, 0, 0];
+        this.timer = 0;
+    }
+
+    c2CostNext(rho) {
+        if (rho < 20) return toBig(20);
+        return toBig(64).pow(((rho / 20).log2() / Math.log2(64)).ceil()) * 20;
+    }
+
+    c4Cost(rho) {
+        if (rho < 100) return toBig(0);
+        return toBig(5 ** 1.15).pow(((rho / 100).log2() / Math.log2(5 ** 1.15)).floor()) * 100;
     }
 
     setPub() {
         const lastPub = this.theory.tauPublished;
-        this.pub = lastPub * 2.5;
+        const c4Step = 5 ** 1.15;
+        const c4Last = this.c4Cost(lastPub);
+        const c2NearC4 = this.c2CostNext(c4Last);
+        const coef = c2NearC4 / c4Last > 7 ? 3 : 4;
+        this.pub = c4Last * c4Step ** coef * 1.1;
         this.coast = this.pub / 4;
+    }
+
+    updateSchedule() {
+        if (this.scheduledUpgrades.length >= 25) return false;
+        const veryBig = parseBigNumber("ee999999");
+
+        while (this.scheduledUpgrades.length < 25) {
+            const costs = [
+                this.c1.cost.getCost(this.c1.level + this.scheduledLevels[0]) * (5.5 + ((this.c1.level + this.scheduledLevels[0]) % 10) / 1.5),
+                this.c2.cost.getCost(this.c2.level + this.scheduledLevels[1]),
+                this.c3.cost.getCost(this.c3.level + this.scheduledLevels[2]) * 4,
+                this.c4.cost.getCost(this.c4.level + this.scheduledLevels[3]) * 1.3,
+                this.c5.cost.getCost(this.c5.level + this.scheduledLevels[4]) * 2.5
+            ];
+
+            let minCost = [veryBig, null];
+            for (let i = 0; i < costs.length; i++) {
+                if (costs[i] < minCost[0]) minCost = [costs[i], i];
+            }
+
+            const cost = this.upgrades[minCost[1]].cost.getCost(this.upgrades[minCost[1]].level + this.scheduledLevels[minCost[1]]);
+            if (cost >= this.coast) break;
+
+            if (minCost[1] != null) {
+                this.scheduledLevels[minCost[1]]++;
+                const last = this.scheduledUpgrades[this.scheduledUpgrades.length - 1];
+                if (last && last[0] == minCost[1]) last[1]++;
+                else this.scheduledUpgrades.push([minCost[1], 1]);
+            }
+        }
+        return true;
+    }
+
+    getScheduleDisplay() {
+        if (!this.scheduledUpgrades.length) return "Scheduling...";
+        let s = "Next: ";
+        for (let i = 0; i < Math.min(this.scheduledUpgrades.length, 5); i++) {
+            if (this.scheduledUpgrades[i][1] > 1) s += this.scheduledUpgrades[i][1];
+            s += "c_" + (this.scheduledUpgrades[i][0] + 1);
+            if (i + 1 < Math.min(this.scheduledUpgrades.length, 5)) s += ", ";
+        }
+        return s;
+    }
+
+    buy() {
+        if (this.theory.tau >= this.coast) return;
+
+        let refresh = false;
+        if (buyRatio(this.c1, 25)) refresh = true;
+        if (buyRatio(this.c2, 2)) refresh = true;
+        if (buyRatio(this.c3, 10)) refresh = true;
+        if (buyRatio(this.c4, 3)) refresh = true;
+        if (buyRatio(this.c5, 5)) refresh = true;
+
+        if (refresh) {
+            this.scheduledUpgrades = [];
+            this.scheduledLevels = [0, 0, 0, 0, 0];
+        }
+
+        let bought = false;
+        while (this.scheduledUpgrades.length) {
+            const idx = this.scheduledUpgrades[0][0];
+            const before = this.upgrades[idx].level;
+            this.upgrades[idx].buy(1);
+            if (before == this.upgrades[idx].level) break;
+
+            bought = true;
+            this.scheduledUpgrades[0][1]--;
+            this.scheduledLevels[idx]--;
+            if (this.scheduledUpgrades[0][1] <= 0) this.scheduledUpgrades.shift();
+        }
+
+        if (this.theory.currencies[0].value > this.theory.tauPublished / 1e20 && (this.updateSchedule() || bought)) {}
+    }
+
+    resetAttractor() {
+        this.timer = 0;
+        this.theory.milestoneUpgrades[0].refund(-1);
+        this.theory.milestoneUpgrades[0].buy(-1);
     }
 
     buyMilestones() {
@@ -1183,40 +1615,21 @@ class T8 extends BaseStrategy {
         }
     }
 
-    getScheduleDisplay() {
-        return "Ratio\\ buying:\\ c_1..c_5";
-    }
-
-    buy() {
-        if (this.theory.tau >= this.coast) return;
-
-        const c5cost = upgradeCost(this.c5);
-        const c4cost = upgradeCost(this.c4);
-        const c3cost = upgradeCost(this.c3);
-
-        if (this.c5.level > this.lastC5) {
-            this.c1.buy(-1);
-            this.c2.buy(-1);
-            this.lastC5 = this.c5.level;
-        }
-
-        buyMax(this.c5, this.theory.currencies[0].value);
-        buyMax(this.c4, c5cost);
-        buyMax(this.c3, c5cost.min(c4cost));
-        buyMax(this.c2, c3cost.min(c4cost).min(c5cost) / 10);
-        buyMax(this.c1, c3cost.min(c4cost).min(c5cost) / 10);
-    }
-
     shouldPublish() {
         return this.theory.tau >= this.pub;
     }
 
     tick(elapsedTime, multiplier) {
         this.buyMilestones();
+
         if (this.shouldPublish()) {
             this.theory.publish();
             return true;
         }
+
+        this.timer++;
+        if (this.timer >= 335) this.resetAttractor();
+
         this.buy();
         return false;
     }
@@ -1230,6 +1643,22 @@ var createStrategy = (theoryId) => {
 };
 
 
+var state = {
+    autoFreq: 42,
+
+    get shouldReallocate() {
+        return this.autoFreq >= 10;
+    },
+
+    serialize() {
+        return JSON.stringify({ autoFreq: this.autoFreq });
+    },
+
+    deserialize(s) {
+        if (!s) return;
+        try { Object.assign(this, JSON.parse(s)); } catch (e) {}
+    }
+};
 var createCurrencyBar = () => {
     const switchBtn = ui.createButton({
         text: "Switch Theory",
