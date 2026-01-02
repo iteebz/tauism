@@ -1267,6 +1267,8 @@ var init = () => {
 };
 
 var tick = (elapsedTime, multiplier) => {
+    if (game.activeTheory?.id === 8) return;
+
     R9 = getR9();
 
     if (state.shouldReallocate && game.statistics.tickCount % state.autoFreq == 0) {
@@ -1275,13 +1277,16 @@ var tick = (elapsedTime, multiplier) => {
         switchTheory();
     }
 
-    if (theoryManager) {
-        if (theoryManager.theory?.isAutoBuyerActive === true)
+    if (game.activeTheory !== null) {
+        if (game.activeTheory.id !== theoryManager?.id || game.activeTheory.currencies[0].value == 0)
+            refreshTheoryManager();
+
+        if (theoryManager?.theory?.isAutoBuyerActive === true)
             theoryManager.theory.isAutoBuyerActive = false;
-        
+
         buyMilestones();
-        const published = theoryManager.tick(elapsedTime, multiplier);
-        if (published) refreshTheoryManager();
+        if (theoryManager.tick(elapsedTime, multiplier))
+            switchTheory();
     }
 
     theory.invalidatePrimaryEquation();
