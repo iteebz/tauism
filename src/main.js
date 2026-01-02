@@ -19,6 +19,9 @@ var tick = (elapsedTime, multiplier) => {
     }
 
     if (theoryManager) {
+        if (theoryManager.theory?.isAutoBuyerActive === true)
+            theoryManager.theory.isAutoBuyerActive = false;
+        
         buyMilestones();
         const published = theoryManager.tick(elapsedTime, multiplier);
         if (published) refreshTheoryManager();
