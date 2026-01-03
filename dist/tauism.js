@@ -1850,7 +1850,7 @@ var getSecondaryEquation = () => {
     }
     if (theoryManager?.getScheduleDisplay) {
         const sched = theoryManager.getScheduleDisplay();
-        if (sched) s += s ? "\\quad" + sched : sched;
+        if (sched) s += s ? ", " + sched : sched;
     }
     return s;
 };
