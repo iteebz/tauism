@@ -22,16 +22,16 @@ class T8 extends BaseStrategy {
 
     c4Cost(rho) {
         if (rho < 100) return toBig(0);
-        return toBig(5 ** 1.15).pow(((rho / 100).log2() / Math.log2(5 ** 1.15)).floor()) * 100;
+        return toBig(Math.pow(5, 1.15)).pow(((rho / 100).log2() / Math.log2(Math.pow(5, 1.15))).floor()) * 100;
     }
 
     setPub() {
         const lastPub = this.theory.tauPublished;
-        const c4Step = 5 ** 1.15;
+        const c4Step = Math.pow(5, 1.15);
         const c4Last = this.c4Cost(lastPub);
         const c2NearC4 = this.c2CostNext(c4Last);
         const coef = c2NearC4 / c4Last > 7 ? 3 : 4;
-        this.pub = c4Last * c4Step ** coef * 1.1;
+        this.pub = c4Last * Math.pow(c4Step, coef) * 1.1;
         this.coast = this.pub / 4;
     }
 

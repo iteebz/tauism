@@ -1,7 +1,7 @@
 var theoryManager = null;
 var R9 = 1;
 
-var getR9 = () => (game.sigmaTotal / 20) ** game.researchUpgrades[8].level;
+var getR9 = () => Math.pow(game.sigmaTotal / 20, game.researchUpgrades[8].level);
 
 var init = () => {
     R9 = getR9();
@@ -79,7 +79,7 @@ var getTauH = (i) => {
     } catch (e) {
         tau = 1;
     }
-    return TAU_BASE[i] * R9 ** (1 / TAU_TIME_MULT[i]) / 2 ** ((tau - TAU_REQUIREMENTS[i]) / TAU_DECAY[i]);
+    return TAU_BASE[i] * Math.pow(R9, 1 / TAU_TIME_MULT[i]) / Math.pow(2, (tau - TAU_REQUIREMENTS[i]) / TAU_DECAY[i]);
 };
 
 var formatQValue = (input) => {
@@ -104,14 +104,14 @@ var getQuaternaryEntries = () => {
     if (game.researchUpgrades[7].level >= 4) {
         let tau;
         try { tau = game.theories[3].tauPublished.log10(); } catch (e) { tau = 1; }
-        const tauH = 1.51 * R9 / 2 ** ((tau - TAU_REQUIREMENTS[3]) / 27.0085302950228);
+        const tauH = 1.51 * R9 / Math.pow(2, (tau - TAU_REQUIREMENTS[3]) / 27.0085302950228);
         quaternaryEntries[3].value = formatQValue(Math.max(tauH, parseFloat(quaternaryEntries[3].value)));
     }
 
     if (game.researchUpgrades[7].level >= 6) {
         let tau;
         try { tau = game.theories[5].tauPublished.log10(); } catch (e) { tau = 1; }
-        const tauH = 7 * R9 ** 0.5 / 2 ** ((tau - TAU_REQUIREMENTS[5]) / 70.0732254255212);
+        const tauH = 7 * Math.pow(R9, 0.5) / Math.pow(2, (tau - TAU_REQUIREMENTS[5]) / 70.0732254255212);
         quaternaryEntries[5].value = formatQValue(Math.max(tauH, parseFloat(quaternaryEntries[5].value)));
     }
 
@@ -132,9 +132,9 @@ var getPrimaryEquation = () => {
 
     let pubTau = theoryManager.pub;
     if (theoryManager.id == 1) {
-        pubTau = theoryManager.theory.tauPublished * theoryManager.pub ** (1 / 0.198);
+        pubTau = theoryManager.theory.tauPublished * Math.pow(theoryManager.pub, 1 / 0.198);
     } else if (theoryManager.id == 2) {
-        pubTau = theoryManager.theory.tauPublished * theoryManager.pub ** (1 / 0.147);
+        pubTau = theoryManager.theory.tauPublished * Math.pow(theoryManager.pub, 1 / 0.147);
     }
 
     text += "Next\\;\\overline{" + theoryManager.theory.latexSymbol + "}&=&" + pubTau + "\\end{eqnarray}";

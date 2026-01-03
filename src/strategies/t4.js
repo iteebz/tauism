@@ -40,7 +40,7 @@ class T4 extends BaseStrategy {
 
     setPub() {
         const lastPub = this.theory.tauPublished;
-        const threshold = this.q2weight * toBig(1000 / 2.468 ** 8);
+        const threshold = this.q2weight * toBig(1000 / Math.pow(2.468, 8));
         let c3Near;
         let c3Last = this.c3Cost(lastPub);
         if (lastPub / c3Last > 5) c3Last *= 2.468;
@@ -61,22 +61,22 @@ class T4 extends BaseStrategy {
         }
 
         let block = 5;
-        const nc3Near = c3Near * 2.468 ** 38;
-        const q2Next = q2Last * 10 ** 15;
+        const nc3Near = c3Near * Math.pow(2.468, 38);
+        const q2Next = q2Last * Math.pow(10, 15);
         if (nc3Near > q2Next * threshold && nc3Near < q2Next * this.q2weight) block = 4;
 
         this.pub = c3Near;
         if (block == 5) {
-            if (c3Amount <= 5) this.pub *= 2.468 ** 10;
-            else if (c3Amount <= 14) this.pub *= 2.468 ** 19;
-            else if (c3Amount <= 23) this.pub *= 2.468 ** 28;
-            else if (c3Amount <= 32) this.pub *= 2.468 ** 37;
-            else this.pub *= 2.468 ** 46;
+            if (c3Amount <= 5) this.pub *= Math.pow(2.468, 10);
+            else if (c3Amount <= 14) this.pub *= Math.pow(2.468, 19);
+            else if (c3Amount <= 23) this.pub *= Math.pow(2.468, 28);
+            else if (c3Amount <= 32) this.pub *= Math.pow(2.468, 37);
+            else this.pub *= Math.pow(2.468, 46);
         } else {
-            if (c3Amount <= 5) this.pub *= 2.468 ** 10;
-            else if (c3Amount <= 15) this.pub *= 2.468 ** 20;
-            else if (c3Amount <= 24) this.pub *= 2.468 ** 29;
-            else this.pub *= 2.468 ** 38;
+            if (c3Amount <= 5) this.pub *= Math.pow(2.468, 10);
+            else if (c3Amount <= 15) this.pub *= Math.pow(2.468, 20);
+            else if (c3Amount <= 24) this.pub *= Math.pow(2.468, 29);
+            else this.pub *= Math.pow(2.468, 38);
         }
 
         if (this.pub < lastPub * 10) this.pub = lastPub * 80;

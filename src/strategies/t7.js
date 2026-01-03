@@ -23,7 +23,7 @@ class T7 extends BaseStrategy {
     setPub() {
         const lastPub = this.theory.tauPublished;
         let c6Next = this.c6CostNext(lastPub);
-        c6Next *= 2.81 ** 5;
+        c6Next *= Math.pow(2.81, 5);
         this.pub = c6Next * 1.03;
         if (this.pub / lastPub < 491) this.pub *= 2.81;
         this.coast = this.pub / 2;

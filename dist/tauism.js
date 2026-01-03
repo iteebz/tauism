@@ -1,3 +1,10 @@
+var id = "tauism";
+var name = "Tauism";
+var description = "The doctrine of tau maximization. Overpush strategies + star/student optimization.";
+var authors = "tauism";
+var version = "0.1.0";
+var permissions = Permissions.PERFORM_GAME_ACTIONS;
+
 var THEORY_COUNT = 8;
 var OVERPUSH = [1, 10, 1, 1.4, 1, 3, 1, 1];
 var TAU_REQUIREMENTS = [150, 250, 175, 175, 150, 150, 175, 220];
@@ -26,6 +33,301 @@ var TAU_BASE = [
     2.15,
     4.93
 ];
+var toBig = n => BigNumber.from(n);
+
+var upgradeCost = upgrade => upgrade.cost.getCost(upgrade.level);
+
+var publicationMultiplier = theory => 
+    theory.nextPublicationMultiplier / theory.publicationMultiplier;
+
+var buyMax = (upgrade, value) => {
+    const spend = value.min(upgrade.currency.value);
+    const levelBefore = upgrade.level;
+    upgrade.buy(upgrade.cost.getMax(upgrade.level, spend));
+    return upgrade.level > levelBefore;
+};
+
+var buyRatio = (upgrade, ratio) => {
+    const bigRatio = typeof ratio === 'object' ? ratio : toBig(ratio);
+    return buyMax(upgrade, upgrade.currency.value / bigRatio);
+};
+class AllocUtils {
+    static simpleStar() {
+        const starUps = Array.from(game.starBonuses).filter(x => x.id >= 4000 && x.id < 5000 && x.isAvailable);
+        const variables = Array.from(game.variables).filter(x => x.id > 0 && x.isAvailable);
+
+        starUps.forEach(x => x.refund(-1));
+
+        const len = Math.min(starUps.length, variables.length);
+
+        let doubleUps = new Set(Array(len).keys());
+        let singleUps = new Set();
+
+        const dThreshold = 0.00001;
+        const sThreshold = dThreshold / 100;
+        const trivialStars = 0.001 * game.starsTotal;
+        const MAX_ITER = 100;
+
+        for (let k = 0; k < MAX_ITER; k++) {
+            let toMove = [];
+            let toDelete = [];
+            let best = null;
+            let best2 = null;
+
+            for (const i of doubleUps) {
+                const up = starUps[i];
+
+                up.buy(-1);
+                const maxLevels = up.level;
+                up.refund(-1);
+
+                const doubleLevels = this.nextDouble(variables[i].level);
+
+                if (maxLevels < doubleLevels) {
+                    toMove.push(i);
+                    continue;
+                }
+
+                const dumpLevels = maxLevels - this.lastDouble(variables[i].level + maxLevels);
+
+                let cost = up.currency.value;
+                up.buy(dumpLevels);
+                cost -= up.currency.value;
+                let dx = game.x;
+                up.refund(dumpLevels);
+                dx -= game.x;
+
+                if (dx < dThreshold * game.x) {
+                    toDelete.push(i);
+                    continue;
+                }
+
+                if (best == null || best.dx * cost < dx * best.cost) {
+                    best2 = best;
+                    best = { isDouble: true, i, dx, cost, cnt: dumpLevels };
+                } else if (best2 == null || best2.dx * cost < dx * best2.cost) {
+                    best2 = { isDouble: true, i, dx, cost, cnt: dumpLevels };
+                }
+            }
+
+            toMove.forEach(i => { doubleUps.delete(i); singleUps.add(i); });
+            toDelete.forEach(i => { doubleUps.delete(i); });
+            toDelete = [];
+
+            for (const i of singleUps) {
+                const up = starUps[i];
+                const cost = up.cost.getCost(up.level);
+
+                if (cost > up.currency.value) {
+                    toDelete.push(i);
+                    continue;
+                }
+
+                up.buy(1);
+                let dx = game.x;
+                up.refund(1);
+                dx -= game.x;
+
+                if (dx < sThreshold * game.x) {
+                    toDelete.push(i);
+                    continue;
+                }
+
+                if (best == null || best.dx * cost < dx * best.cost) {
+                    best2 = best;
+                    best = { isDouble: false, i, dx, cost, cnt: 1 };
+                } else if (best2 == null || best2.dx * cost < dx * best2.cost) {
+                    best2 = { isDouble: false, i, dx, cost, cnt: 1 };
+                }
+            }
+
+            toDelete.forEach(i => { singleUps.delete(i); });
+
+            if (best == null) break;
+
+            if (best.isDouble) {
+                starUps[best.i].buy(best.cnt);
+                doubleUps.delete(best.i);
+                singleUps.add(best.i);
+            } else if (best2 == null) {
+                starUps[best.i].buy(-1);
+                singleUps.delete(best.i);
+            } else {
+                const bestup = starUps[best.i];
+                let cost = best.cost;
+                let dx = best.dx;
+                for (let i = 0; i < MAX_ITER; i++) {
+                    bestup.buy(1);
+
+                    cost = bestup.cost.getCost(bestup.level);
+                    if (cost > bestup.currency.value) break;
+                    if (cost < trivialStars) continue;
+
+                    bestup.buy(1);
+                    dx = game.x;
+                    bestup.refund(1);
+                    dx -= game.x;
+
+                    if (best2.dx * cost > dx * best2.cost) break;
+                }
+            }
+        }
+    }
+
+    static nextDouble(level) {
+        if (level >= 24000) return 400 - (level % 400);
+        if (level >= 10000) return 200 - (level % 200);
+        if (level >= 6000) return 100 - (level % 100);
+        if (level >= 1500) return 50 - (level % 50);
+        if (level >= 10) return 25 - (level % 25);
+        return 10 - level;
+    }
+
+    static lastDouble(level) {
+        if (level >= 24000) return level % 400;
+        if (level >= 10000) return level % 200;
+        if (level >= 6000) return level % 100;
+        if (level >= 1500) return level % 50;
+        if (level >= 25) return level % 25;
+        if (level >= 10) return level - 10;
+        return level;
+    }
+
+    static simpleStudent(useR9) {
+        const upgrades = Array.from(game.researchUpgrades).filter(x => x.id <= 101 && x.isAvailable);
+        upgrades.forEach(x => x.refund(-1));
+
+        if (useR9) game.researchUpgrades[8].buy(-1);
+        else game.researchUpgrades[8].refund(-1);
+
+        const maxLevels = upgrades.map(x => x.maxLevel);
+        const expIndex = upgrades.length - 1;
+        let levels = upgrades.map(x => x.level);
+        let sigma = game.sigma.toNumber();
+        let curSum = BigNumber.ZERO;
+        let history = [];
+
+        const vals = [
+            (game.dt * game.acceleration * (game.isRewardActive ? 1.5 : 1)).log(),
+            (1 + game.t).log() * 0.7,
+            (1 + game.starsTotal).log(),
+            (1 + game.db).log() / (100 * (10 + game.db).log10()).sqrt(),
+            (1 + game.dmu).log() / 1300,
+            (1 + game.dpsi).log() / 255 * (10 + game.dpsi).log10().sqrt()
+        ].map(v => v.toNumber());
+
+        while (true) {
+            let cand = null;
+            let cval = BigNumber.ZERO;
+
+            for (let i = 0; i < upgrades.length; i++) {
+                if (levels[i] >= maxLevels[i]) continue;
+
+                const cost = (i == expIndex) ? 2 : this.researchCost(levels[i]);
+                const curval = (i == expIndex) ? curSum / 20 : vals[i] / cost;
+
+                if (curval > cval) {
+                    cand = (cost <= sigma) ? i : null;
+                    cval = curval;
+                }
+            }
+
+            if (cand == null) break;
+
+            history.push(cand);
+            if (cand == expIndex) {
+                sigma -= 2;
+            } else {
+                curSum += vals[cand];
+                sigma -= this.researchCost(levels[cand]);
+            }
+            levels[cand] += 1;
+        }
+
+        while (history.length > 0) {
+            let pool = 1;
+            let dims = 0;
+
+            for (let i = 0; i < upgrades.length; i++) {
+                if (levels[i] >= maxLevels[i]) continue;
+                let more = (i == expIndex) ? Math.floor(sigma / 2) : this.maxPurchaseCount(levels[i], sigma);
+                pool *= Math.min(more, maxLevels[i] - levels[i]) + 1;
+                dims += 1;
+            }
+
+            const heur = dims < 6 ? pool / 3 : pool / (dims == 6 ? 20 : 60);
+
+            if (heur > this.MAX_DFS_SIZE) break;
+
+            const lastbest = history.pop();
+
+            if (lastbest == expIndex) {
+                levels[lastbest] -= 1;
+                sigma += 2;
+            } else {
+                const lastlevel = levels[lastbest] - 1;
+                const lastcost = this.researchCost(lastlevel);
+                levels[lastbest] -= 1;
+                sigma += lastcost;
+                curSum -= vals[lastbest];
+            }
+        }
+
+        const search = (i, sigma, curSum) => {
+            if (i == expIndex) {
+                const cnt = Math.min(levels[i] + sigma / 2 >> 0, 6);
+                return { cnt: [cnt], maxSum: curSum * (1 + cnt / 10) };
+            }
+            let maxres = null;
+            for (let j = levels[i]; j <= maxLevels[i]; j++) {
+                let res = search(i + 1, sigma, curSum);
+                if (maxres == null || res.maxSum >= maxres.maxSum) {
+                    maxres = res;
+                    maxres.cnt.push(j);
+                }
+                sigma -= this.researchCost(j);
+                if (sigma < 0) break;
+                curSum += vals[i];
+            }
+            return maxres;
+        };
+
+        const found = search(0, sigma, curSum);
+        for (let i = 0; i <= expIndex; i++)
+            upgrades[i].buy(found.cnt[expIndex - i]);
+    }
+
+    static researchCost(curLevel) {
+        return Math.floor(curLevel / 2 + 1);
+    }
+
+    static maxPurchaseCount(curLevel, sigma) {
+        let levels = 0;
+
+        if (this.researchCost(curLevel) > sigma) return levels;
+
+        if (curLevel % 2 == 1) {
+            sigma -= this.researchCost(curLevel);
+            curLevel += 1;
+            levels += 1;
+        }
+
+        curLevel += 1;
+        const bulks = Math.floor((-curLevel + Math.sqrt(curLevel * curLevel + 4 * sigma)) / 2);
+
+        sigma -= bulks * (curLevel + bulks);
+        curLevel += 2 * bulks - 1;
+        levels += 2 * bulks;
+
+        if (this.researchCost(curLevel) <= sigma) {
+            levels += 1;
+        }
+
+        return levels;
+    }
+}
+
+AllocUtils.MAX_DFS_SIZE = 300;
 var state = {
     autoFreq: 42,
 
@@ -561,7 +863,7 @@ class T4 extends BaseStrategy {
 
     setPub() {
         const lastPub = this.theory.tauPublished;
-        const threshold = this.q2weight * toBig(1000 / 2.468 ** 8);
+        const threshold = this.q2weight * toBig(1000 / Math.pow(2.468, 8));
         let c3Near;
         let c3Last = this.c3Cost(lastPub);
         if (lastPub / c3Last > 5) c3Last *= 2.468;
@@ -582,22 +884,22 @@ class T4 extends BaseStrategy {
         }
 
         let block = 5;
-        const nc3Near = c3Near * 2.468 ** 38;
-        const q2Next = q2Last * 10 ** 15;
+        const nc3Near = c3Near * Math.pow(2.468, 38);
+        const q2Next = q2Last * Math.pow(10, 15);
         if (nc3Near > q2Next * threshold && nc3Near < q2Next * this.q2weight) block = 4;
 
         this.pub = c3Near;
         if (block == 5) {
-            if (c3Amount <= 5) this.pub *= 2.468 ** 10;
-            else if (c3Amount <= 14) this.pub *= 2.468 ** 19;
-            else if (c3Amount <= 23) this.pub *= 2.468 ** 28;
-            else if (c3Amount <= 32) this.pub *= 2.468 ** 37;
-            else this.pub *= 2.468 ** 46;
+            if (c3Amount <= 5) this.pub *= Math.pow(2.468, 10);
+            else if (c3Amount <= 14) this.pub *= Math.pow(2.468, 19);
+            else if (c3Amount <= 23) this.pub *= Math.pow(2.468, 28);
+            else if (c3Amount <= 32) this.pub *= Math.pow(2.468, 37);
+            else this.pub *= Math.pow(2.468, 46);
         } else {
-            if (c3Amount <= 5) this.pub *= 2.468 ** 10;
-            else if (c3Amount <= 15) this.pub *= 2.468 ** 20;
-            else if (c3Amount <= 24) this.pub *= 2.468 ** 29;
-            else this.pub *= 2.468 ** 38;
+            if (c3Amount <= 5) this.pub *= Math.pow(2.468, 10);
+            else if (c3Amount <= 15) this.pub *= Math.pow(2.468, 20);
+            else if (c3Amount <= 24) this.pub *= Math.pow(2.468, 29);
+            else this.pub *= Math.pow(2.468, 38);
         }
 
         if (this.pub < lastPub * 10) this.pub = lastPub * 80;
@@ -954,7 +1256,7 @@ class T6 extends BaseStrategy {
             const c2cost = this.c2.cost.getCost(this.c2.level + this.scheduledLevels[5]);
             const q2cost = this.q2.cost.getCost(this.q2.level + this.scheduledLevels[1]);
             const r2cost = this.r2.cost.getCost(this.r2.level + this.scheduledLevels[3]);
-            const c2weight = (c2cost * 2 ** 0.5 > r2cost.min(q2cost)) ? 2 ** 0.5 : 1;
+            const c2weight = (c2cost * Math.pow(2, 0.5) > r2cost.min(q2cost)) ? Math.pow(2, 0.5) : 1;
 
             const costs = [
                 this.q1.cost.getCost(this.q1.level + this.scheduledLevels[0]) * (7 + (this.q1.level % 10) / 2),
@@ -1039,7 +1341,7 @@ class T6 extends BaseStrategy {
             k = (this.getMaxC5 * rHalf) / (this.getC1 * this.getC2);
             const c1w = upgradeCost(this.c1) * (8 + this.c1.level % 10);
             const c2cost = upgradeCost(this.c2);
-            const c2weight = (c2cost * 2 ** 0.5 > upgradeCost(this.r2).min(upgradeCost(this.q2))) ? 2 ** 0.5 : 1;
+            const c2weight = (c2cost * Math.pow(2, 0.5) > upgradeCost(this.r2).min(upgradeCost(this.q2))) ? Math.pow(2, 0.5) : 1;
 
             const costs = [
                 upgradeCost(this.q1) * (7 + (this.q1.level % 10) / 2),
@@ -1110,7 +1412,7 @@ class T7 extends BaseStrategy {
     setPub() {
         const lastPub = this.theory.tauPublished;
         let c6Next = this.c6CostNext(lastPub);
-        c6Next *= 2.81 ** 5;
+        c6Next *= Math.pow(2.81, 5);
         this.pub = c6Next * 1.03;
         if (this.pub / lastPub < 491) this.pub *= 2.81;
         this.coast = this.pub / 2;
@@ -1245,16 +1547,16 @@ class T8 extends BaseStrategy {
 
     c4Cost(rho) {
         if (rho < 100) return toBig(0);
-        return toBig(5 ** 1.15).pow(((rho / 100).log2() / Math.log2(5 ** 1.15)).floor()) * 100;
+        return toBig(Math.pow(5, 1.15)).pow(((rho / 100).log2() / Math.log2(Math.pow(5, 1.15))).floor()) * 100;
     }
 
     setPub() {
         const lastPub = this.theory.tauPublished;
-        const c4Step = 5 ** 1.15;
+        const c4Step = Math.pow(5, 1.15);
         const c4Last = this.c4Cost(lastPub);
         const c2NearC4 = this.c2CostNext(c4Last);
         const coef = c2NearC4 / c4Last > 7 ? 3 : 4;
-        this.pub = c4Last * c4Step ** coef * 1.1;
+        this.pub = c4Last * Math.pow(c4Step, coef) * 1.1;
         this.coast = this.pub / 4;
     }
 
@@ -1364,10 +1666,44 @@ class T8 extends BaseStrategy {
         return false;
     }
 }
+
+var strategies = [T1, T2, T3, T4, T5, T6, T7, T8];
+
+var createStrategy = (theoryId) => {
+    if (theoryId < 0 || theoryId > 7) return null;
+    return new strategies[theoryId]();
+};
+
+
+var createCurrencyBar = () => {
+    const switchBtn = ui.createButton({
+        text: "Switch Theory",
+        onClicked: () => switchTheory()
+    });
+
+    const starBtn = ui.createButton({
+        text: "Realloc ★",
+        onClicked: () => AllocUtils.simpleStar()
+    });
+
+    const sigmaBtn = ui.createButton({
+        text: "Realloc σ",
+        onClicked: () => AllocUtils.simpleStudent(true)
+    });
+
+    switchBtn.row = 0; switchBtn.column = 0;
+    starBtn.row = 0; starBtn.column = 1;
+    sigmaBtn.row = 0; sigmaBtn.column = 2;
+
+    return ui.createGrid({
+        columnDefinitions: ["1*", "1*", "1*"],
+        children: [switchBtn, starBtn, sigmaBtn]
+    });
+};
 var theoryManager = null;
 var R9 = 1;
 
-var getR9 = () => (game.sigmaTotal / 20) ** game.researchUpgrades[8].level;
+var getR9 = () => Math.pow(game.sigmaTotal / 20, game.researchUpgrades[8].level);
 
 var init = () => {
     R9 = getR9();
@@ -1445,7 +1781,7 @@ var getTauH = (i) => {
     } catch (e) {
         tau = 1;
     }
-    return TAU_BASE[i] * R9 ** (1 / TAU_TIME_MULT[i]) / 2 ** ((tau - TAU_REQUIREMENTS[i]) / TAU_DECAY[i]);
+    return TAU_BASE[i] * Math.pow(R9, 1 / TAU_TIME_MULT[i]) / Math.pow(2, (tau - TAU_REQUIREMENTS[i]) / TAU_DECAY[i]);
 };
 
 var formatQValue = (input) => {
@@ -1470,14 +1806,14 @@ var getQuaternaryEntries = () => {
     if (game.researchUpgrades[7].level >= 4) {
         let tau;
         try { tau = game.theories[3].tauPublished.log10(); } catch (e) { tau = 1; }
-        const tauH = 1.51 * R9 / 2 ** ((tau - TAU_REQUIREMENTS[3]) / 27.0085302950228);
+        const tauH = 1.51 * R9 / Math.pow(2, (tau - TAU_REQUIREMENTS[3]) / 27.0085302950228);
         quaternaryEntries[3].value = formatQValue(Math.max(tauH, parseFloat(quaternaryEntries[3].value)));
     }
 
     if (game.researchUpgrades[7].level >= 6) {
         let tau;
         try { tau = game.theories[5].tauPublished.log10(); } catch (e) { tau = 1; }
-        const tauH = 7 * R9 ** 0.5 / 2 ** ((tau - TAU_REQUIREMENTS[5]) / 70.0732254255212);
+        const tauH = 7 * Math.pow(R9, 0.5) / Math.pow(2, (tau - TAU_REQUIREMENTS[5]) / 70.0732254255212);
         quaternaryEntries[5].value = formatQValue(Math.max(tauH, parseFloat(quaternaryEntries[5].value)));
     }
 
@@ -1498,9 +1834,9 @@ var getPrimaryEquation = () => {
 
     let pubTau = theoryManager.pub;
     if (theoryManager.id == 1) {
-        pubTau = theoryManager.theory.tauPublished * theoryManager.pub ** (1 / 0.198);
+        pubTau = theoryManager.theory.tauPublished * Math.pow(theoryManager.pub, 1 / 0.198);
     } else if (theoryManager.id == 2) {
-        pubTau = theoryManager.theory.tauPublished * theoryManager.pub ** (1 / 0.147);
+        pubTau = theoryManager.theory.tauPublished * Math.pow(theoryManager.pub, 1 / 0.147);
     }
 
     text += "Next\\;\\overline{" + theoryManager.theory.latexSymbol + "}&=&" + pubTau + "\\end{eqnarray}";

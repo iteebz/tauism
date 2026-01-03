@@ -64,7 +64,7 @@ class T6 extends BaseStrategy {
             const c2cost = this.c2.cost.getCost(this.c2.level + this.scheduledLevels[5]);
             const q2cost = this.q2.cost.getCost(this.q2.level + this.scheduledLevels[1]);
             const r2cost = this.r2.cost.getCost(this.r2.level + this.scheduledLevels[3]);
-            const c2weight = (c2cost * 2 ** 0.5 > r2cost.min(q2cost)) ? 2 ** 0.5 : 1;
+            const c2weight = (c2cost * Math.pow(2, 0.5) > r2cost.min(q2cost)) ? Math.pow(2, 0.5) : 1;
 
             const costs = [
                 this.q1.cost.getCost(this.q1.level + this.scheduledLevels[0]) * (7 + (this.q1.level % 10) / 2),
@@ -149,7 +149,7 @@ class T6 extends BaseStrategy {
             k = (this.getMaxC5 * rHalf) / (this.getC1 * this.getC2);
             const c1w = upgradeCost(this.c1) * (8 + this.c1.level % 10);
             const c2cost = upgradeCost(this.c2);
-            const c2weight = (c2cost * 2 ** 0.5 > upgradeCost(this.r2).min(upgradeCost(this.q2))) ? 2 ** 0.5 : 1;
+            const c2weight = (c2cost * Math.pow(2, 0.5) > upgradeCost(this.r2).min(upgradeCost(this.q2))) ? Math.pow(2, 0.5) : 1;
 
             const costs = [
                 upgradeCost(this.q1) * (7 + (this.q1.level % 10) / 2),
